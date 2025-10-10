@@ -2,6 +2,60 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [5.1.0](https://github.com/aws-actions/configure-aws-credentials/compare/v5.0.0...v5.1.0) (2025-10-06)
+
+
+### Features
+
+* Add global timeout support ([#1487](https://github.com/aws-actions/configure-aws-credentials/issues/1487)) ([1584b8b](https://github.com/aws-actions/configure-aws-credentials/commit/1584b8b0e2062557287c28fbe9b8920df434e866))
+* add no-proxy support ([#1482](https://github.com/aws-actions/configure-aws-credentials/issues/1482)) ([dde9b22](https://github.com/aws-actions/configure-aws-credentials/commit/dde9b22a8e889a0821997a21a2c5a38020ee8de3))
+* Improve debug logging in retry logic ([#1485](https://github.com/aws-actions/configure-aws-credentials/issues/1485)) ([97ef425](https://github.com/aws-actions/configure-aws-credentials/commit/97ef425d73aa532439f54f90d0e83101a186c5a6))
+
+
+### Bug Fixes
+
+* properly expose getProxyForUrl (introduced in [#1482](https://github.com/aws-actions/configure-aws-credentials/issues/1482)) ([#1486](https://github.com/aws-actions/configure-aws-credentials/issues/1486)) ([cea4298](https://github.com/aws-actions/configure-aws-credentials/commit/cea42985ac88b42678fbc84c18066a7f07f05176))
+
+## [5.0.0](https://github.com/aws-actions/configure-aws-credentials/compare/v4.3.1...v5.0.0) (2025-09-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* Cleanup input handling. Changes invalid boolean input behavior (see #1445)
+
+### Features
+
+* add skip OIDC option ([#1458](https://github.com/aws-actions/configure-aws-credentials/issues/1458)) ([8c45f6b](https://github.com/aws-actions/configure-aws-credentials/commit/8c45f6b08196feb86cfdbe431541d5571d9ab2c2))
+* Cleanup input handling. Changes invalid boolean input behavior (see [#1445](https://github.com/aws-actions/configure-aws-credentials/issues/1445)) ([74b3e27](https://github.com/aws-actions/configure-aws-credentials/commit/74b3e27aa80db064b5bb8c04b22fc607e817acf7))
+* support account id allowlist ([#1456](https://github.com/aws-actions/configure-aws-credentials/issues/1456)) ([c4be498](https://github.com/aws-actions/configure-aws-credentials/commit/c4be498953fc1da2707a50ce4b761a53af3d02af))
+
+## [4.3.1](https://github.com/aws-actions/configure-aws-credentials/compare/v4.3.0...v4.3.1) (2025-08-04)
+
+
+### Bug Fixes
+
+* update readme to 4.3.1 ([#1424](https://github.com/aws-actions/configure-aws-credentials/issues/1424)) ([be2e7ad](https://github.com/aws-actions/configure-aws-credentials/commit/be2e7ad815e27b890489a89ce2717b0f9e26b56e))
+
+## [4.3.0](https://github.com/aws-actions/configure-aws-credentials/compare/v4.2.1...v4.3.0) (2025-08-04)
+
+
+### Features
+
+* depenency update and feature cleanup ([#1414](https://github.com/aws-actions/configure-aws-credentials/issues/1414)) ([59489ba](https://github.com/aws-actions/configure-aws-credentials/commit/59489ba544930000b7b67412c167f5fe816568cf)), closes [#1062](https://github.com/aws-actions/configure-aws-credentials/issues/1062) [#1191](https://github.com/aws-actions/configure-aws-credentials/issues/1191)
+* Optional environment variable output ([c3b3ce6](https://github.com/aws-actions/configure-aws-credentials/commit/c3b3ce61b02510937ff02916a4eb153874bc5085))
+
+
+### Bug Fixes
+
+* **docs:** readme samples versioning ([5b3c895](https://github.com/aws-actions/configure-aws-credentials/commit/5b3c89504689ea1ea2b6000b23a6a2aac463662a))
+* the wrong example region for China partition in README ([37fe9a7](https://github.com/aws-actions/configure-aws-credentials/commit/37fe9a740bcb30ee8cccd96feb90666c937311f2))
+* properly set proxy environment variable ([cbea708](https://github.com/aws-actions/configure-aws-credentials/commit/cbea70821e4ab985ad3be0e5a93390523e257cde))
+
+
+### Miscellaneous Chores
+
+* release 4.3.0 ([3f7c218](https://github.com/aws-actions/configure-aws-credentials/commit/3f7c2187213bafaa1ea60a850b27082cbf55dda0))
+
 ## [4.2.1](https://github.com/aws-actions/configure-aws-credentials/compare/v4.2.0...v4.2.1) (2025-05-14)
 
 

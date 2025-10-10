@@ -1,13 +1,14 @@
 import * as core from '@actions/core';
 import type { AssumeRoleCommandOutput } from '@aws-sdk/client-sts';
-import { CredentialsClient } from './CredentialsClient';
 import { assumeRole } from './assumeRole';
+import { CredentialsClient } from './CredentialsClient';
 import {
   areCredentialsValid,
   errorMessage,
   exportAccountId,
   exportCredentials,
   exportRegion,
+  getBooleanInput,
   retryAndBackoff,
   translateEnvVariables,
   unsetCredentials,
@@ -22,68 +23,68 @@ export async function run() {
   try {
     translateEnvVariables();
     // Get inputs
+    // Undefined inputs are empty strings ( or empty arrays)
     const AccessKeyId = core.getInput('aws-access-key-id', { required: false });
-    const SecretAccessKey = core.getInput('aws-secret-access-key', {
-      required: false,
-    });
-    const sessionTokenInput = core.getInput('aws-session-token', {
-      required: false,
-    });
+    const SecretAccessKey = core.getInput('aws-secret-access-key', { required: false });
+    const sessionTokenInput = core.getInput('aws-session-token', { required: false });
     const SessionToken = sessionTokenInput === '' ? undefined : sessionTokenInput;
     const region = core.getInput('aws-region', { required: true });
     const roleToAssume = core.getInput('role-to-assume', { required: false });
     const audience = core.getInput('audience', { required: false });
-    const maskAccountIdInput = core.getInput('mask-aws-account-id', { required: false }) || 'false';
-    const maskAccountId = maskAccountIdInput.toLowerCase() === 'true';
-    const roleExternalId = core.getInput('role-external-id', {
-      required: false,
-    });
-    const webIdentityTokenFile = core.getInput('web-identity-token-file', {
-      required: false,
-    });
+    const maskAccountId = getBooleanInput('mask-aws-account-id', { required: false });
+    const roleExternalId = core.getInput('role-external-id', { required: false });
+    const webIdentityTokenFile = core.getInput('web-identity-token-file', { required: false });
     const roleDuration =
       Number.parseInt(core.getInput('role-duration-seconds', { required: false })) || DEFAULT_ROLE_DURATION;
     const roleSessionName = core.getInput('role-session-name', { required: false }) || ROLE_SESSION_NAME;
-    const roleSkipSessionTaggingInput = core.getInput('role-skip-session-tagging', { required: false }) || 'false';
-    const roleSkipSessionTagging = roleSkipSessionTaggingInput.toLowerCase() === 'true';
-    const proxyServer = core.getInput('http-proxy', { required: false });
-    const inlineSessionPolicy = core.getInput('inline-session-policy', {
-      required: false,
+    const roleSkipSessionTagging = getBooleanInput('role-skip-session-tagging', { required: false });
+    const proxyServer = core.getInput('http-proxy', { required: false }) || process.env.HTTP_PROXY;
+    const inlineSessionPolicy = core.getInput('inline-session-policy', { required: false });
+    const managedSessionPolicies = core.getMultilineInput('managed-session-policies', { required: false }).map((p) => {
+      return { arn: p };
     });
-    const managedSessionPoliciesInput = core.getMultilineInput('managed-session-policies', { required: false });
-    const managedSessionPolicies: { arn: string }[] = [];
-    const roleChainingInput = core.getInput('role-chaining', { required: false }) || 'false';
-    const roleChaining = roleChainingInput.toLowerCase() === 'true';
-    const outputCredentialsInput = core.getInput('output-credentials', { required: false }) || 'false';
-    const outputCredentials = outputCredentialsInput.toLowerCase() === 'true';
-    const outputEnvCredentialsInput = core.getInput('output-env-credentials', { required: false }) || 'true';
-    const outputEnvCredentials = outputEnvCredentialsInput.toLowerCase() === 'true';
-    const unsetCurrentCredentialsInput = core.getInput('unset-current-credentials', { required: false }) || 'false';
-    const unsetCurrentCredentials = unsetCurrentCredentialsInput.toLowerCase() === 'true';
-    const disableRetryInput = core.getInput('disable-retry', { required: false }) || 'false';
-    let disableRetry = disableRetryInput.toLowerCase() === 'true';
-    const specialCharacterWorkaroundInput =
-      core.getInput('special-characters-workaround', { required: false }) || 'false';
-    const specialCharacterWorkaround = specialCharacterWorkaroundInput.toLowerCase() === 'true';
-    const useExistingCredentialsInput = core.getInput('use-existing-credentials', { required: false }) || 'false';
-    const useExistingCredentials = useExistingCredentialsInput.toLowerCase() === 'true';
+    const roleChaining = getBooleanInput('role-chaining', { required: false });
+    const outputCredentials = getBooleanInput('output-credentials', { required: false });
+    const outputEnvCredentials = getBooleanInput('output-env-credentials', { required: false, default: true });
+    const unsetCurrentCredentials = getBooleanInput('unset-current-credentials', { required: false });
+    let disableRetry = getBooleanInput('disable-retry', { required: false });
+    const specialCharacterWorkaround = getBooleanInput('special-characters-workaround', { required: false });
+    const useExistingCredentials = core.getInput('use-existing-credentials', { required: false });
     let maxRetries = Number.parseInt(core.getInput('retry-max-attempts', { required: false })) || 12;
-    switch (true) {
-      case specialCharacterWorkaround:
-        // 😳
-        disableRetry = false;
-        maxRetries = 12;
-        break;
-      case maxRetries < 1:
-        maxRetries = 1;
-        break;
+    const expectedAccountIds = core
+      .getInput('allowed-account-ids', { required: false })
+      .split(',')
+      .map((s) => s.trim());
+    const forceSkipOidc = getBooleanInput('force-skip-oidc', { required: false });
+    const noProxy = core.getInput('no-proxy', { required: false });
+    const globalTimeout = Number.parseInt(core.getInput('action-timeout-s', { required: false })) || 0;
+
+    let timeoutId: NodeJS.Timeout | undefined;
+    if (globalTimeout > 0) {
+      core.info(`Setting a global timeout of ${globalTimeout} seconds for the action`);
+      timeoutId = setTimeout(() => {
+        core.setFailed(`Action timed out after ${globalTimeout} seconds`);
+        process.exit(1);
+      }, globalTimeout * 1000);
     }
-    for (const managedSessionPolicy of managedSessionPoliciesInput) {
-      managedSessionPolicies.push({ arn: managedSessionPolicy });
+
+    if (forceSkipOidc && roleToAssume && !AccessKeyId && !webIdentityTokenFile) {
+      throw new Error(
+        "If 'force-skip-oidc' is true and 'role-to-assume' is set, 'aws-access-key-id' or 'web-identity-token-file' must be set",
+      );
+    }
+
+    if (specialCharacterWorkaround) {
+      // 😳
+      disableRetry = false;
+      maxRetries = 12;
+    } else if (maxRetries < 1) {
+      maxRetries = 1;
     }
 
     // Logic to decide whether to attempt to use OIDC or not
     const useGitHubOIDCProvider = () => {
+      if (forceSkipOidc) return false;
       // The `ACTIONS_ID_TOKEN_REQUEST_TOKEN` environment variable is set when the `id-token` permission is granted.
       // This is necessary to authenticate with OIDC, but not strictly set just for OIDC. If it is not set and all other
       // checks pass, it is likely but not guaranteed that the user needs but lacks this permission in their workflow.
@@ -119,7 +120,10 @@ export async function run() {
     exportRegion(region, outputEnvCredentials);
 
     // Instantiate credentials client
-    const credentialsClient = new CredentialsClient({ region, proxyServer });
+    const clientProps: { region: string; proxyServer?: string; noProxy?: string } = { region };
+    if (proxyServer) clientProps.proxyServer = proxyServer;
+    if (noProxy) clientProps.noProxy = noProxy;
+    const credentialsClient = new CredentialsClient(clientProps);
     let sourceAccountId: string;
     let webIdentityToken: string;
 
@@ -128,6 +132,7 @@ export async function run() {
       const validCredentials = await areCredentialsValid(credentialsClient);
       if (validCredentials) {
         core.notice('Pre-existing credentials are valid. No need to generate new ones.');
+        if (timeoutId) clearTimeout(timeoutId);
         return;
       }
       core.notice('No valid credentials exist. Running as normal.');
@@ -158,7 +163,7 @@ export async function run() {
       exportCredentials({ AccessKeyId, SecretAccessKey, SessionToken }, outputCredentials, outputEnvCredentials);
     } else if (!webIdentityTokenFile && !roleChaining) {
       // Proceed only if credentials can be picked up
-      await credentialsClient.validateCredentials();
+      await credentialsClient.validateCredentials(undefined, roleChaining, expectedAccountIds);
       sourceAccountId = await exportAccountId(credentialsClient, maskAccountId);
     }
 
@@ -166,7 +171,7 @@ export async function run() {
       // Validate that the SDK can actually pick up credentials.
       // This validates cases where this action is using existing environment credentials,
       // and cases where the user intended to provide input credentials but the secrets inputs resolved to empty strings.
-      await credentialsClient.validateCredentials(AccessKeyId, roleChaining);
+      await credentialsClient.validateCredentials(AccessKeyId, roleChaining, expectedAccountIds);
       sourceAccountId = await exportAccountId(credentialsClient, maskAccountId);
     }
 
@@ -201,7 +206,11 @@ export async function run() {
       //  is set to `true` then we are NOT in a self-hosted runner.
       // Second: Customer provided credentials manually (IAM User keys stored in GH Secrets)
       if (!process.env.GITHUB_ACTIONS || AccessKeyId) {
-        await credentialsClient.validateCredentials(roleCredentials.Credentials?.AccessKeyId);
+        await credentialsClient.validateCredentials(
+          roleCredentials.Credentials?.AccessKeyId,
+          roleChaining,
+          expectedAccountIds,
+        );
       }
       if (outputEnvCredentials) {
         await exportAccountId(credentialsClient, maskAccountId);
@@ -209,11 +218,13 @@ export async function run() {
     } else {
       core.info('Proceeding with IAM user credentials');
     }
+
+    // Clear timeout on successful completion
+    if (timeoutId) clearTimeout(timeoutId);
   } catch (error) {
     core.setFailed(errorMessage(error));
 
     const showStackTrace = process.env.SHOW_STACK_TRACE;
-
     if (showStackTrace === 'true') {
       throw error;
     }
